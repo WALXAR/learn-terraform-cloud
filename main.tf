@@ -1,28 +1,42 @@
-provider "aws" {
-  region = var.region
+# Define the provider for Azure
+provider "azurerm" {
+  features {}
 }
 
-data "aws_ami" "ubuntu" {
-  most_recent = true
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  owners = ["099720109477"] # Canonical
+resource "azurerm_resource_group" "rg-aks" {
+  name     = "rg-aks-training"
+  location = "eastus"
 }
 
-resource "aws_instance" "ubuntu" {
-  ami           = data.aws_ami.ubuntu.id
-  instance_type = var.instance_type
+resource "azurerm_kubernetes_cluster" "aks-walxar" {
+  name                = "walxar-aks"
+  location            = azurerm_resource_group.rg-aks.location
+  resource_group_name = azurerm_resource_group.rg-aks.name
+  dns_prefix          = "walxar"
+  kubernetes_version  = "1.24.10"
+
+  default_node_pool {
+    name       = "default"
+    node_count = 1
+    vm_size    = "Standard_D2_v2"
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
 
   tags = {
-    Name = var.instance_name
+    Environment = "Production"
   }
+}
+
+output "client_certificate" {
+  value     = azurerm_kubernetes_cluster.aks-walxar.kube_config.0.client_certificate
+  sensitive = true
+}
+
+output "kube_config" {
+  value = azurerm_kubernetes_cluster.aks-walxar.kube_config_raw
+
+  sensitive = true
 }
